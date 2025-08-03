@@ -36,9 +36,11 @@ if st.button("Recommend Songs"):
         else:
             st.subheader("🎧 Recommended Songs:")
             for idx, row in recs.iterrows():
-                st.markdown(f"**{row['title']}** by *{row['artist']}* [{row['genre'].capitalize()}]  
-                ▶️ [Listen on YouTube]({row['url']})", unsafe_allow_html=True)
+                st.markdown(
+                    f"**{row['title']}** by *{row['artist']}* [{row['genre'].capitalize()}]  \n"
+                    f"▶️ [Listen on YouTube]({row['url']})",
+                    unsafe_allow_html=True
+                )
                 st.markdown("---")
 
-            
 
