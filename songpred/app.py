@@ -6,7 +6,7 @@ from transformers import pipeline
 sentiment_pipeline = pipeline("sentiment-analysis")
 
 # Load your songs dataset
-songs = pd.read_csv("songs.csv")
+songs = pd.read_csv("songpred/songs.csv")
 
 # Map emotions to genres (you can customize this)
 emotion_to_genres = {
