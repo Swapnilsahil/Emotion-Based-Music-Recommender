@@ -1,72 +1,70 @@
-
 import streamlit as st
 import pandas as pd
 from transformers import pipeline
 from fer import FER
 import cv2
 import tempfile
+from PIL import Image
 
-# Load emotion classifier (text)
-text_emotion_classifier = pipeline("text-classification", model="bhadresh-savani/bert-base-go-emotion", return_all_scores=False)
+# Load sentiment analysis model
+st.set_page_config(page_title="Emotion-Based Music Recommender", layout="centered")
+st.title("🎧 Emotion-Based Music Recommender")
+st.markdown("Upload an image or type how you feel, and we'll suggest songs that match your mood!")
 
-# Load songs database
+# Load data
 songs = pd.read_csv("songs.csv")
 
-# Emotion-to-genre map
+# Emotion to genre mapping
 emotion_to_genre = {
-    "joy": ["pop", "indie", "upbeat"],
-    "sadness": ["soft rock", "piano", "lofi"],
-    "anger": ["metal", "rap"],
+    "happy": ["pop", "dance"],
+    "sad": ["acoustic", "piano"],
+    "angry": ["rock", "metal"],
     "fear": ["ambient", "instrumental"],
-    "neutral": ["lofi", "chill"],
-    "surprise": ["edm", "upbeat"],
-    "disgust": ["jazz", "classical"],
-    "love": ["romantic", "acoustic"],
-    "optimism": ["pop", "edm"],
-    "grief": ["piano", "soft rock"],
-    "admiration": ["indie", "lofi"],
-    "amusement": ["pop", "edm"],
+    "surprise": ["electronic", "alternative"],
+    "disgust": ["grunge", "dark"],
+    "neutral": ["indie", "folk"]
 }
 
-st.title("🎧 Emotion-Based Music Recommender")
+# ---------------- Text-Based Emotion ---------------- #
+st.header("📝 Text-Based Emotion")
+user_input = st.text_input("Describe your mood (e.g., 'I feel great today!')")
 
-choice = st.radio("Choose Input Type", ["Text", "Image"])
+if user_input:
+    sentiment_pipeline = pipeline("sentiment-analysis")
+    result = sentiment_pipeline(user_input)[0]
+    st.write(f"Detected Emotion: **{result['label'].lower()}**")
 
-detected_emotion = None
+    emotion = result['label'].lower()
+    genre_list = emotion_to_genre.get(emotion, ["pop"])  # fallback to pop
 
-# TEXT INPUT
-if choice == "Text":
-    user_input = st.text_input("How are you feeling?")
-    if st.button("Detect Emotion (Text)"):
-        if user_input.strip():
-            detected_emotion = text_emotion_classifier(user_input)[0]['label']
-            st.success(f"Detected Emotion: **{detected_emotion}**")
+    recommendations = songs[songs['genre'].isin(genre_list)].sample(5, replace=True)
+    st.subheader("🎵 Recommended Songs:")
+    st.table(recommendations[["title", "artist", "genre"]])
 
-# IMAGE INPUT
-elif choice == "Image":
-    uploaded_file = st.file_uploader("Upload a selfie", type=["jpg", "jpeg", "png"])
-    if uploaded_file is not None:
-        st.image(uploaded_file, width=250, caption="Uploaded Image")
-        if st.button("Detect Emotion (Image)"):
-            temp_file = tempfile.NamedTemporaryFile(delete=False)
-            temp_file.write(uploaded_file.read())
-            img = cv2.imread(temp_file.name)
 
-            detector = FER(mtcnn=True)
-            detected_emotion, score = detector.top_emotion(img)
-            if detected_emotion:
-                st.success(f"Detected Emotion: **{detected_emotion}**")
-            else:
-                st.error("Could not detect emotion from the image.")
+# ---------------- Image-Based Emotion ---------------- #
+st.header("📷 Image-Based Emotion")
+uploaded_image = st.file_uploader("Upload a selfie or facial photo", type=["jpg", "png", "jpeg"])
 
-# Show recommendations
-if detected_emotion:
-    genres = emotion_to_genre.get(detected_emotion.lower(), ["pop", "lofi"])  # fallback
-    matched_songs = songs[songs['genre'].isin(genres)]
+if uploaded_image:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
+        tmp_file.write(uploaded_image.read())
+        tmp_path = tmp_file.name
 
-    if not matched_songs.empty:
-        st.markdown("### 🎵 Recommended Songs:")
-        for _, row in matched_songs.sample(n=min(5, len(matched_songs))).iterrows():
-            st.markdown(f"- [{row['title']} - {row['artist']}]({row['url']})")
+    image = cv2.imread(tmp_path)
+    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+    detector = FER(mtcnn=True)
+    emotions = detector.detect_emotions(image_rgb)
+
+    if emotions:
+        top_emotion = max(emotions[0]["emotions"], key=emotions[0]["emotions"].get)
+        st.image(image_rgb, caption=f"Detected Emotion: {top_emotion}", use_column_width=True)
+
+        genre_list = emotion_to_genre.get(top_emotion, ["pop"])
+        recommendations = songs[songs['genre'].isin(genre_list)].sample(5, replace=True)
+        st.subheader("🎵 Recommended Songs:")
+        st.table(recommendations[["title", "artist", "genre"]])
     else:
-        st.warning("No songs found for this emotion.")
+        st.warning("Couldn't detect any face. Try uploading a clearer image.")
+
