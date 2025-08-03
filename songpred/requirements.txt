@@ -1,0 +1,10 @@
+streamlit
+pandas
+transformers
+torch
+fer
+opencv-python
+Pillow
+scikit-learn
+matplotlib
+numpy
